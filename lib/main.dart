@@ -46,6 +46,7 @@ class _DashboardState extends State<Dashboard> {
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
   int nextDraftNumber = 1;
+  bool loaded = false;
   @override
   void initState() {
     super.initState();
@@ -58,6 +59,7 @@ class _DashboardState extends State<Dashboard> {
       if (!mounted) return;
       setState(() {
         nextDraftNumber = (data['nextDraftNumber'] as num?)?.toInt() ?? 1;
+        loaded = true;
         customers
           ..clear()
           ..addAll((data['customers'] as List? ?? []).whereType<Map>().map((e) =>
@@ -74,8 +76,11 @@ class _DashboardState extends State<Dashboard> {
             )));
       });
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gespeicherte Daten konnten nicht geladen werden.')));
+      if (mounted) {
+        setState(() => loaded = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gespeicherte Daten konnten nicht geladen werden.')));
+      }
     }
   }
 
@@ -193,7 +198,7 @@ class _DashboardState extends State<Dashboard> {
     final shown = documents.where((d) => d.isInvoice == (selected == 3)).toList();
     return Scaffold(
       appBar: AppBar(title: Text('BIZPILOT AI · ${titles[selected]}')),
-      body: SafeArea(child: Padding(padding: const EdgeInsets.all(16),
+      body: !loaded ? const Center(child: CircularProgressIndicator()) : SafeArea(child: Padding(padding: const EdgeInsets.all(16),
         child: switch (selected) {
           0 => ListView(children: [
             const Text('Dein Business im Überblick', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
@@ -229,7 +234,7 @@ class _DashboardState extends State<Dashboard> {
               }),
         },
       )),
-      floatingActionButton: selected == 0 ? null : FloatingActionButton(
+      floatingActionButton: !loaded || selected == 0 ? null : FloatingActionButton(
         onPressed: selected == 1 ? addCustomer : () => addDocument(selected == 3),
         child: const Icon(Icons.add)),
       bottomNavigationBar: NavigationBar(selectedIndex: selected,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'storage.dart';
+import 'document_calculation.dart';
 
 void main() => runApp(const BizPilotApp());
 
@@ -29,6 +30,7 @@ class BusinessDocument {
   final String description;
   final double amount;
   final bool isInvoice;
+  List<DraftLine> get lines => [DraftLine(description: description, quantity: 1, unitPriceCents: (amount * 100).round())];
 }
 
 class Dashboard extends StatefulWidget {
@@ -45,6 +47,7 @@ class _DashboardState extends State<Dashboard> {
   final emailController = TextEditingController();
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
+  final quantityController = TextEditingController(text: '1');
   int nextDraftNumber = 1;
   bool loaded = false;
   @override
@@ -107,7 +110,7 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
-    for (final c in [nameController, emailController, descriptionController, amountController]) {
+    for (final c in [nameController, emailController, descriptionController, amountController, quantityController]) {
       c.dispose();
     }
     super.dispose();
@@ -161,6 +164,7 @@ class _DashboardState extends State<Dashboard> {
     }
     descriptionController.clear();
     amountController.clear();
+    quantityController.text = '1';
     var customerIndex = 0;
     await showDialog<void>(
       context: context,
@@ -174,8 +178,10 @@ class _DashboardState extends State<Dashboard> {
             onChanged: (v) { if (v != null) updateDialog(() => customerIndex = v); },
           ),
           TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Leistung')),
+          TextField(controller: quantityController, keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Menge')),
           TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Betrag in EUR (Entwurf)')),
+            decoration: const InputDecoration(labelText: 'Einzelpreis in EUR (Entwurf)')),
           const SizedBox(height: 12),
           const Text('Nur interner Entwurf: keine Steuerberechnung, keine rechtssichere Rechnung.'),
         ])),
@@ -183,11 +189,14 @@ class _DashboardState extends State<Dashboard> {
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Abbrechen')),
           FilledButton(onPressed: () {
             final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
-            if (descriptionController.text.trim().isEmpty || amount == null || !amount.isFinite || amount < 0) return;
+            final quantity = int.tryParse(quantityController.text.trim());
+            if (descriptionController.text.trim().isEmpty || amount == null || !amount.isFinite || amount < 0 || quantity == null || quantity <= 0) return;
+            final cents = (amount * 100).round();
+            final total = DraftTotals.subtotalCents([DraftLine(description: descriptionController.text.trim(), quantity: quantity, unitPriceCents: cents)]);
             final number = 'ENT-${nextDraftNumber.toString().padLeft(4, '0')}';
             nextDraftNumber++;
             setState(() => documents.add(BusinessDocument(
-              number, customers[customerIndex].name, descriptionController.text.trim(), amount, invoice)));
+              number, customers[customerIndex].name, descriptionController.text.trim(), total / 100, invoice)));
             _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Entwurf speichern')),

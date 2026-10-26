@@ -1,0 +1,11 @@
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+android/key.properties
+ios/Flutter/Generated.xcconfig

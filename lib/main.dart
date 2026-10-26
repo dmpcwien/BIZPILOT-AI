@@ -24,13 +24,13 @@ class Customer {
 }
 
 class BusinessDocument {
-  BusinessDocument(this.number, this.customer, this.description, this.amount, this.isInvoice);
+  BusinessDocument(this.number, this.customer, this.description, this.amount, this.isInvoice, [List<DraftLine>? items]) : items = items ?? [DraftLine(description: description, quantity: 1, unitPriceCents: (amount * 100).round())];
   final String number;
   final String customer;
   final String description;
   final double amount;
   final bool isInvoice;
-  List<DraftLine> get lines => [DraftLine(description: description, quantity: 1, unitPriceCents: (amount * 100).round())];
+  final List<DraftLine> items;
 }
 
 class Dashboard extends StatefulWidget {
@@ -80,6 +80,9 @@ class _DashboardState extends State<Dashboard> {
               e['description']?.toString() ?? '',
               (e['amount'] as num?)?.toDouble() ?? 0,
               e['isInvoice'] == true,
+              (e['items'] as List? ?? []).whereType<Map>().map((item) => DraftLine.fromJson(Map<String, dynamic>.from(item))).toList().isEmpty
+                ? null
+                : (e['items'] as List).whereType<Map>().map((item) => DraftLine.fromJson(Map<String, dynamic>.from(item))).toList(),
             )));
       });
     } catch (_) {
@@ -99,6 +102,7 @@ class _DashboardState extends State<Dashboard> {
         'documents': documents.map((e) => {
           'number': e.number, 'customer': e.customer, 'description': e.description,
           'amount': e.amount, 'isInvoice': e.isInvoice,
+          'items': e.items.map((line) => line.toJson()).toList(),
         }).toList(),
       });
     } catch (_) {
@@ -166,6 +170,8 @@ class _DashboardState extends State<Dashboard> {
     amountController.clear();
     quantityController.text = '1';
     var customerIndex = 0;
+    final lines = <DraftLine>[];
+    var discountPercent = 0;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(builder: (context, updateDialog) => AlertDialog(
@@ -183,20 +189,48 @@ class _DashboardState extends State<Dashboard> {
           TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Einzelpreis in EUR (Entwurf)')),
           const SizedBox(height: 12),
-          const Text('Nur interner Entwurf: keine Steuerberechnung, keine rechtssichere Rechnung.'),
+          OutlinedButton.icon(
+            onPressed: () {
+              final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
+              final quantity = int.tryParse(quantityController.text.trim());
+              if (descriptionController.text.trim().isEmpty || amount == null ||
+                  !amount.isFinite || amount < 0 || quantity == null || quantity <= 0) return;
+              updateDialog(() => lines.add(DraftLine(
+                description: descriptionController.text.trim(),
+                quantity: quantity, unitPriceCents: (amount * 100).round())));
+              descriptionController.clear();
+              amountController.clear();
+              quantityController.text = '1';
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Position hinzufügen'),
+          ),
+          ...lines.asMap().entries.map((entry) => ListTile(
+            dense: true,
+            title: Text(entry.value.description),
+            subtitle: Text('${entry.value.quantity} × ${DraftTotals.euro(entry.value.unitPriceCents)}'),
+            trailing: IconButton(icon: const Icon(Icons.close),
+              onPressed: () => updateDialog(() => lines.removeAt(entry.key))),
+          )),
+          DropdownButtonFormField<int>(
+            initialValue: discountPercent,
+            decoration: const InputDecoration(labelText: 'Rabatt auf Entwurf'),
+            items: [0, 5, 10, 15, 20].map((p) => DropdownMenuItem(value: p, child: Text('$p %'))).toList(),
+            onChanged: (v) { if (v != null) updateDialog(() => discountPercent = v); },
+          ),
+          Text('Gesamt: ${DraftTotals.euro(DraftTotals.afterDiscountCents(lines, discountPercent * 100))}'),
+          const Text('Interner Entwurf ohne Steuerberechnung; keine rechtsgültige Rechnung.'),
+
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Abbrechen')),
           FilledButton(onPressed: () {
-            final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
-            final quantity = int.tryParse(quantityController.text.trim());
-            if (descriptionController.text.trim().isEmpty || amount == null || !amount.isFinite || amount < 0 || quantity == null || quantity <= 0) return;
-            final cents = (amount * 100).round();
-            final total = DraftTotals.subtotalCents([DraftLine(description: descriptionController.text.trim(), quantity: quantity, unitPriceCents: cents)]);
+            if (lines.isEmpty) return;
+            final total = DraftTotals.afterDiscountCents(lines, discountPercent * 100);
             final number = 'ENT-${nextDraftNumber.toString().padLeft(4, '0')}';
             nextDraftNumber++;
             setState(() => documents.add(BusinessDocument(
-              number, customers[customerIndex].name, descriptionController.text.trim(), total / 100, invoice)));
+              number, customers[customerIndex].name, lines.map((l) => l.description).join(', '), total / 100, invoice, List.of(lines))));
             _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Entwurf speichern')),
@@ -238,7 +272,7 @@ class _DashboardState extends State<Dashboard> {
                 final d = shown[i];
                 return Card(child: ListTile(
                   title: Text('${d.number} · ${d.customer}'),
-                  subtitle: Text(d.description),
+                  subtitle: Text('${d.items.length} Position(en) · ${d.description}'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('${d.amount.toStringAsFixed(2)} €'),
                     IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline),

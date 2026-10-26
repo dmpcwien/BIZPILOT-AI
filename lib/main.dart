@@ -58,7 +58,11 @@ class _DashboardState extends State<Dashboard> {
       final data = await LocalStorage.load();
       if (!mounted) return;
       setState(() {
-        nextDraftNumber = (data['nextDraftNumber'] as num?)?.toInt() ?? 1;
+        final savedNext = (data['nextDraftNumber'] as num?)?.toInt() ?? 1;
+        final existing = (data['documents'] as List? ?? []).whereType<Map>()
+          .map((d) => int.tryParse((d['number']?.toString() ?? '').replaceFirst('ENT-', '')) ?? 0)
+          .fold<int>(0, (maxValue, n) => n > maxValue ? n : maxValue);
+        nextDraftNumber = savedNext > existing ? savedNext : existing + 1;
         loaded = true;
         customers
           ..clear()

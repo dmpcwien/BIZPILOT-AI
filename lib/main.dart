@@ -26,12 +26,13 @@ class Customer {
 }
 
 class BusinessDocument {
-  BusinessDocument(this.number, this.customer, this.description, this.amount, this.isInvoice, [List<DraftLine>? items]) : items = items ?? [DraftLine(description: description, quantity: 1, unitPriceCents: (amount * 100).round())];
+  BusinessDocument(this.number, this.customer, this.description, this.amount, this.isInvoice, [List<DraftLine>? items, this.discountPercent = 0]) : items = items ?? [DraftLine(description: description, quantity: 1, unitPriceCents: (amount * 100).round())];
   final String number;
   final String customer;
   final String description;
   final double amount;
   final bool isInvoice;
+  final int discountPercent;
   final List<DraftLine> items;
 }
 
@@ -85,6 +86,7 @@ class _DashboardState extends State<Dashboard> {
               (e['items'] as List? ?? []).whereType<Map>().map((item) => DraftLine.fromJson(Map<String, dynamic>.from(item))).toList().isEmpty
                 ? null
                 : (e['items'] as List).whereType<Map>().map((item) => DraftLine.fromJson(Map<String, dynamic>.from(item))).toList(),
+              (e['discountPercent'] as num?)?.toInt() ?? 0,
             )));
       });
     } catch (_) {
@@ -105,6 +107,7 @@ class _DashboardState extends State<Dashboard> {
           'number': e.number, 'customer': e.customer, 'description': e.description,
           'amount': e.amount, 'isInvoice': e.isInvoice,
           'items': e.items.map((line) => line.toJson()).toList(),
+          'discountPercent': e.discountPercent,
         }).toList(),
       });
     } catch (_) {
@@ -163,7 +166,7 @@ class _DashboardState extends State<Dashboard> {
       await Printing.layoutPdf(
         name: '${document.number}.pdf',
         onLayout: (_) => createDraftPdf(
-          document.number, document.customer, document.items, 0),
+          document.number, document.customer, document.items, document.discountPercent),
       );
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -245,7 +248,7 @@ class _DashboardState extends State<Dashboard> {
             final number = 'ENT-${nextDraftNumber.toString().padLeft(4, '0')}';
             nextDraftNumber++;
             setState(() => documents.add(BusinessDocument(
-              number, customers[customerIndex].name, lines.map((l) => l.description).join(', '), total / 100, invoice, List.of(lines))));
+              number, customers[customerIndex].name, lines.map((l) => l.description).join(', '), total / 100, invoice, List.of(lines), discountPercent)));
             _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Entwurf speichern')),

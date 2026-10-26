@@ -126,6 +126,22 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  Future<void> removeCustomer(int index) async {
+    final name = customers[index].name;
+    if (documents.any((d) => d.customer == name)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Kunde wird in einem Entwurf verwendet und kann nicht gelöscht werden.')));
+      return;
+    }
+    setState(() => customers.removeAt(index));
+    await _persist();
+  }
+
+  Future<void> removeDocument(BusinessDocument document) async {
+    setState(() => documents.remove(document));
+    await _persist();
+  }
+
   Future<void> addDocument(bool invoice) async {
     if (customers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte zuerst einen Kunden anlegen.')));
@@ -191,7 +207,9 @@ class _DashboardState extends State<Dashboard> {
             ? const Center(child: Text('Noch keine Kunden. Tippe auf +.'))
             : ListView.builder(itemCount: customers.length, itemBuilder: (_, i) => Card(child: ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: Text(customers[i].name), subtitle: Text(customers[i].email)))),
+                title: Text(customers[i].name), subtitle: Text(customers[i].email),
+                trailing: IconButton(tooltip: 'Kunde löschen', icon: const Icon(Icons.delete_outline),
+                  onPressed: () => removeCustomer(i))))),
           _ => shown.isEmpty
             ? Center(child: Text('Noch keine ${selected == 3 ? 'Rechnungs-' : 'Angebots-'}entwürfe. Tippe auf +.'))
             : ListView.builder(itemCount: shown.length, itemBuilder: (_, i) {
@@ -199,7 +217,11 @@ class _DashboardState extends State<Dashboard> {
                 return Card(child: ListTile(
                   title: Text('${d.number} · ${d.customer}'),
                   subtitle: Text(d.description),
-                  trailing: Text('${d.amount.toStringAsFixed(2)} €')));
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${d.amount.toStringAsFixed(2)} €'),
+                    IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline),
+                      onPressed: () => removeDocument(d)),
+                  ])));
               }),
         },
       )),

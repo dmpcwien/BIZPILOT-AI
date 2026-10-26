@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'storage.dart';
 
 void main() => runApp(const BizPilotApp());
 
@@ -44,6 +45,53 @@ class _DashboardState extends State<Dashboard> {
   final emailController = TextEditingController();
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    try {
+      final data = await LocalStorage.load();
+      if (!mounted) return;
+      setState(() {
+        customers
+          ..clear()
+          ..addAll((data['customers'] as List? ?? []).whereType<Map>().map((e) =>
+            Customer(e['name']?.toString() ?? '', e['email']?.toString() ?? '')));
+        documents
+          ..clear()
+          ..addAll((data['documents'] as List? ?? []).whereType<Map>().map((e) =>
+            BusinessDocument(
+              e['number']?.toString() ?? '',
+              e['customer']?.toString() ?? '',
+              e['description']?.toString() ?? '',
+              (e['amount'] as num?)?.toDouble() ?? 0,
+              e['isInvoice'] == true,
+            )));
+      });
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gespeicherte Daten konnten nicht geladen werden.')));
+    }
+  }
+
+  Future<void> _persist() async {
+    try {
+      await LocalStorage.save({
+        'customers': customers.map((e) => {'name': e.name, 'email': e.email}).toList(),
+        'documents': documents.map((e) => {
+          'number': e.number, 'customer': e.customer, 'description': e.description,
+          'amount': e.amount, 'isInvoice': e.isInvoice,
+        }).toList(),
+      });
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Speichern fehlgeschlagen.')));
+    }
+  }
+
 
   @override
   void dispose() {
@@ -70,6 +118,7 @@ class _DashboardState extends State<Dashboard> {
           FilledButton(onPressed: () {
             if (nameController.text.trim().isEmpty) return;
             setState(() => customers.add(Customer(nameController.text.trim(), emailController.text.trim())));
+            _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Speichern')),
         ],
@@ -110,6 +159,7 @@ class _DashboardState extends State<Dashboard> {
             final number = 'ENT-${(documents.length + 1).toString().padLeft(4, '0')}';
             setState(() => documents.add(BusinessDocument(
               number, customer, descriptionController.text.trim(), amount, invoice)));
+            _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Entwurf speichern')),
         ],
@@ -135,7 +185,7 @@ class _DashboardState extends State<Dashboard> {
             Card(child: ListTile(leading: const Icon(Icons.receipt_long), title: const Text('Rechnungsentwürfe'),
               trailing: Text('${documents.where((d) => d.isInvoice).length}'))),
             const SizedBox(height: 12),
-            const Text('Prototyp: Daten bleiben nur bis zum Schließen der App erhalten. Keine echten Rechnungen versenden.'),
+            const Text('Prototyp: Daten lokal gespeichert, noch nicht verschlüsselt oder synchronisiert. Keine echten Rechnungen versenden.'),
           ]),
           1 => customers.isEmpty
             ? const Center(child: Text('Noch keine Kunden. Tippe auf +.'))

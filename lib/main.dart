@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'storage.dart';
 import 'document_calculation.dart';
+import 'draft_pdf.dart';
+import 'package:printing/printing.dart';
 
 void main() => runApp(const BizPilotApp());
 
@@ -156,6 +158,19 @@ class _DashboardState extends State<Dashboard> {
     await _persist();
   }
 
+  Future<void> previewDocument(BusinessDocument document) async {
+    try {
+      await Printing.layoutPdf(
+        name: '${document.number}.pdf',
+        onLayout: (_) => createDraftPdf(
+          document.number, document.customer, document.items, 0),
+      );
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF-Vorschau konnte nicht geöffnet werden.')));
+    }
+  }
+
   Future<void> removeDocument(BusinessDocument document) async {
     setState(() => documents.remove(document));
     await _persist();
@@ -275,6 +290,8 @@ class _DashboardState extends State<Dashboard> {
                   subtitle: Text('${d.items.length} Position(en) · ${d.description}'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('${d.amount.toStringAsFixed(2)} €'),
+                    IconButton(tooltip: 'PDF-Vorschau', icon: const Icon(Icons.picture_as_pdf_outlined),
+                      onPressed: () => previewDocument(d)),
                     IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline),
                       onPressed: () => removeDocument(d)),
                   ])));

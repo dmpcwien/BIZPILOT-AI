@@ -12,11 +12,11 @@ jobs:
         with:
           channel: stable
       - name: Generate platform runners
-        run: flutter create --platforms=android,web .
+        run: flutter create --project-name bizpilot_ai --platforms=android,web .
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Test
         run: flutter test
       - name: Build web

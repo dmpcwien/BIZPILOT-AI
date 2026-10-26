@@ -62,7 +62,7 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _restore() async {
     try {
       final data = await LocalStorage.load();
-      if (!mounted) return;
+      if (!mounted) { return; }
       setState(() {
         final savedNext = (data['nextDraftNumber'] as num?)?.toInt() ?? 1;
         final existing = (data['documents'] as List? ?? []).whereType<Map>()
@@ -111,8 +111,10 @@ class _DashboardState extends State<Dashboard> {
         }).toList(),
       });
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Speichern fehlgeschlagen.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speichern fehlgeschlagen.')));
+      }
     }
   }
 
@@ -140,7 +142,7 @@ class _DashboardState extends State<Dashboard> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Abbrechen')),
           FilledButton(onPressed: () {
-            if (nameController.text.trim().isEmpty) return;
+            if (nameController.text.trim().isEmpty) { return; }
             setState(() => customers.add(Customer(nameController.text.trim(), emailController.text.trim())));
             _persist();
             Navigator.pop(dialogContext);
@@ -169,8 +171,10 @@ class _DashboardState extends State<Dashboard> {
           document.number, document.customer, document.items, document.discountPercent),
       );
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF-Vorschau konnte nicht geöffnet werden.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF-Vorschau konnte nicht geöffnet werden.')));
+      }
     }
   }
 
@@ -199,7 +203,7 @@ class _DashboardState extends State<Dashboard> {
             initialValue: customerIndex,
             decoration: const InputDecoration(labelText: 'Kunde'),
             items: List.generate(customers.length, (i) => DropdownMenuItem(value: i, child: Text(customers[i].name))),
-            onChanged: (v) { if (v != null) updateDialog(() => customerIndex = v); },
+            onChanged: (v) { if (v != null) { updateDialog(() => customerIndex = v); } },
           ),
           TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Leistung')),
           TextField(controller: quantityController, keyboardType: TextInputType.number,
@@ -212,7 +216,7 @@ class _DashboardState extends State<Dashboard> {
               final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
               final quantity = int.tryParse(quantityController.text.trim());
               if (descriptionController.text.trim().isEmpty || amount == null ||
-                  !amount.isFinite || amount < 0 || quantity == null || quantity <= 0) return;
+                  !amount.isFinite || amount < 0 || quantity == null || quantity <= 0) { return; }
               updateDialog(() => lines.add(DraftLine(
                 description: descriptionController.text.trim(),
                 quantity: quantity, unitPriceCents: (amount * 100).round())));
@@ -234,7 +238,7 @@ class _DashboardState extends State<Dashboard> {
             initialValue: discountPercent,
             decoration: const InputDecoration(labelText: 'Rabatt auf Entwurf'),
             items: [0, 5, 10, 15, 20].map((p) => DropdownMenuItem(value: p, child: Text('$p %'))).toList(),
-            onChanged: (v) { if (v != null) updateDialog(() => discountPercent = v); },
+            onChanged: (v) { if (v != null) { updateDialog(() => discountPercent = v); } },
           ),
           Text('Gesamt: ${DraftTotals.euro(DraftTotals.afterDiscountCents(lines, discountPercent * 100))}'),
           const Text('Interner Entwurf ohne Steuerberechnung; keine rechtsgültige Rechnung.'),
@@ -243,7 +247,7 @@ class _DashboardState extends State<Dashboard> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Abbrechen')),
           FilledButton(onPressed: () {
-            if (lines.isEmpty) return;
+            if (lines.isEmpty) { return; }
             final total = DraftTotals.afterDiscountCents(lines, discountPercent * 100);
             final number = 'ENT-${nextDraftNumber.toString().padLeft(4, '0')}';
             nextDraftNumber++;

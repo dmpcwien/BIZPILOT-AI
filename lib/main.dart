@@ -45,6 +45,7 @@ class _DashboardState extends State<Dashboard> {
   final emailController = TextEditingController();
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
+  int nextDraftNumber = 1;
   @override
   void initState() {
     super.initState();
@@ -56,6 +57,7 @@ class _DashboardState extends State<Dashboard> {
       final data = await LocalStorage.load();
       if (!mounted) return;
       setState(() {
+        nextDraftNumber = (data['nextDraftNumber'] as num?)?.toInt() ?? 1;
         customers
           ..clear()
           ..addAll((data['customers'] as List? ?? []).whereType<Map>().map((e) =>
@@ -80,6 +82,7 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _persist() async {
     try {
       await LocalStorage.save({
+        'nextDraftNumber': nextDraftNumber,
         'customers': customers.map((e) => {'name': e.name, 'email': e.email}).toList(),
         'documents': documents.map((e) => {
           'number': e.number, 'customer': e.customer, 'description': e.description,
@@ -149,17 +152,17 @@ class _DashboardState extends State<Dashboard> {
     }
     descriptionController.clear();
     amountController.clear();
-    var customer = customers.first.name;
+    var customerIndex = 0;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(builder: (context, updateDialog) => AlertDialog(
         title: Text(invoice ? 'Rechnungsentwurf' : 'Angebotsentwurf'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-            initialValue: customer,
+          DropdownButtonFormField<int>(
+            initialValue: customerIndex,
             decoration: const InputDecoration(labelText: 'Kunde'),
-            items: customers.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
-            onChanged: (v) { if (v != null) updateDialog(() => customer = v); },
+            items: List.generate(customers.length, (i) => DropdownMenuItem(value: i, child: Text(customers[i].name))),
+            onChanged: (v) { if (v != null) updateDialog(() => customerIndex = v); },
           ),
           TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Leistung')),
           TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -172,9 +175,10 @@ class _DashboardState extends State<Dashboard> {
           FilledButton(onPressed: () {
             final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.'));
             if (descriptionController.text.trim().isEmpty || amount == null || !amount.isFinite || amount < 0) return;
-            final number = 'ENT-${(documents.length + 1).toString().padLeft(4, '0')}';
+            final number = 'ENT-${nextDraftNumber.toString().padLeft(4, '0')}';
+            nextDraftNumber++;
             setState(() => documents.add(BusinessDocument(
-              number, customer, descriptionController.text.trim(), amount, invoice)));
+              number, customers[customerIndex].name, descriptionController.text.trim(), amount, invoice)));
             _persist();
             Navigator.pop(dialogContext);
           }, child: const Text('Entwurf speichern')),
